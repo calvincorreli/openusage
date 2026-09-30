@@ -43,9 +43,9 @@ Upgrading from a version without Swap support refreshes saved shell settings bef
 ### Other Codex homes and pi logins
 
 OpenUsage also finds signed-in accounts in `CODEX_HOME`, `~/.codex`, `~/.config/codex`, sibling
-`~/.codex-*` folders, sibling `~/.config/codex-*` folders, and pi's `auth.json`. Logins are matched by
-ChatGPT workspace and email, so two users in
-the same workspace remain separate cards. Restart OpenUsage after adding or removing a login.
+`~/.codex-*` folders, sibling `~/.config/codex-*` folders, and pi's `auth.json`. Logins are matched
+by ChatGPT workspace and email, so two users in the same workspace remain separate cards. Restart
+OpenUsage after adding or removing a login.
 
 Codex home credentials can refresh and write back to their own `auth.json`. Pi credentials stay
 read-only. OpenUsage reloads pi's `auth.json` on every refresh, tries every matching pi login, and

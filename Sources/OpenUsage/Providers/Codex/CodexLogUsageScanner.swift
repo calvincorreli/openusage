@@ -5,7 +5,7 @@ import Foundation
 /// `ccusage` CLI.
 ///
 /// Ports ccusage's Codex adapter semantics:
-/// - Homes come from a single `CODEX_HOME` path when set, else `~/.codex`. Each home contributes its
+/// - Homes come from `CODEX_HOME` (comma-separated), else `~/.codex`. Each home contributes its
 ///   `sessions/` and `archived_sessions/` dirs; when both hold the same relative file path the
 ///   active `sessions/` copy wins.
 /// - A `turn_context` line updates the session's current model; an `event_msg`/`token_count` line
@@ -123,12 +123,15 @@ actor CodexLogUsageScanner {
 
     // MARK: - Discovery
 
-    /// A single `CODEX_HOME` path when set, else `~/.codex`.
+    /// `CODEX_HOME` entries (comma-separated) when set, else `~/.codex` — same as ccusage.
     private func codexHomes() -> [URL] {
         let extra = additionalHomes.map { URL(fileURLWithPath: expandHome($0)) }
         if let raw = environment.value(for: "CODEX_HOME")?.trimmingCharacters(in: .whitespacesAndNewlines),
            !raw.isEmpty {
-            return [URL(fileURLWithPath: expandHome(raw))] + extra
+            return raw.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .map { URL(fileURLWithPath: expandHome($0)) } + extra
         }
         return [homeDirectory().appendingPathComponent(".codex")] + extra
     }

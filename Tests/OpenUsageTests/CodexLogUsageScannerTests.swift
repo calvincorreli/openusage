@@ -752,28 +752,6 @@ final class CodexLogUsageScannerTests: XCTestCase {
         XCTAssertEqual(scan?.series.daily.reduce(0) { $0 + $1.totalTokens }, 200)
     }
 
-    func testScanTreatsConfiguredCommaPathAsSingleHome() async throws {
-        let day = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))
-        let home = FileManager.default.temporaryDirectory
-            .appendingPathComponent("openusage-codex,\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: home) }
-
-        let session = home.appendingPathComponent("sessions/rollout-a.jsonl")
-        try FileManager.default.createDirectory(at: session.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try CodexLogFixture.tokenCount(
-            timestamp: day, last: CodexLogFixture.usage(input: 100, output: 50), model: "gpt-5.2"
-        ).write(to: session, atomically: true, encoding: .utf8)
-
-        let scanner = CodexLogUsageScanner(
-            environment: FakeEnvironment(["CODEX_HOME": home.path]),
-            homeDirectory: { FileManager.default.temporaryDirectory.appendingPathComponent("openusage-no-codex-home") },
-            incrementalScanner: IncrementalJSONLScanner<CodexLogUsageScanner.Event>()
-        )
-        let scan = await scanner.scan(pricing: fixedRates())
-
-        XCTAssertEqual(scan?.series.daily.reduce(0) { $0 + $1.totalTokens }, 150)
-    }
-
     func testScanPrefersActiveSessionsCopyOverArchivedDuplicate() async throws {
         let day = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))
         let content = CodexLogFixture.tokenCount(
