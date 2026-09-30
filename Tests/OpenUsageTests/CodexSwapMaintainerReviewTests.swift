@@ -169,6 +169,21 @@ final class CodexSwapMaintainerReviewTests: XCTestCase {
         XCTAssertNil(snapshot.errorCategory)
     }
 
+    func testNonstandardSwapMainHomePathsAreExcludedFromWritableAuthHomes() async throws {
+        for mainHome in ["/test/default/", "/test/scratch/../default/."] {
+            let files = files(mainHome: mainHome)
+            files.files["/test/default/auth.json"] = CodexSwapAccountTests.credential(b, token: "managed-main")
+            let assembly = await ProviderAccountAssembly.make(
+                observer: observer(files: files, keychain: FakeKeychain()),
+                accountsStore: ProviderAccountsStore(defaults: try defaults()),
+                families: ["codex"]
+            )
+            let work = try XCTUnwrap(assembly.codexCards.first { $0.identity == b })
+            XCTAssertTrue(work.authHomes.contains("/test/default"), mainHome)
+            XCTAssertFalse(work.writableAuthHomes.contains("/test/default"), mainHome)
+        }
+    }
+
     func testUnownedCachedSpendIsRemovedBeforeAnExpiredLoginOrCacheHitCanKeepIt() async throws {
         for persistedFreshness in [false, true] {
             let defaults = try defaults()

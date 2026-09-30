@@ -241,11 +241,15 @@ struct CodexAccountDiscovery: Sendable {
         return labels
     }
 
+    static func standardizedHome(_ raw: String, homeDirectory: URL) -> String {
+        let expanded = expandTilde(raw, homeDirectory: homeDirectory).trimmingTrailingSlashes
+        return URL(fileURLWithPath: expanded).standardizedFileURL.path
+    }
+
     private static func uniqueHomes(_ homes: [String], homeDirectory: URL) -> [String] {
         var seen = Set<String>()
         return homes.compactMap { raw in
-            let expanded = expandTilde(raw, homeDirectory: homeDirectory).trimmingTrailingSlashes
-            let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
+            let standardized = standardizedHome(raw, homeDirectory: homeDirectory)
             return seen.insert(standardized).inserted ? standardized : nil
         }
     }

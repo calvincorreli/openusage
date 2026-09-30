@@ -123,7 +123,10 @@ extension ProviderAccountAssembly {
         let records = accountsStore.reconcile(with: observations)
         let allowsUnattributed = !hasIncompleteHomeLogin && !piScan.hasIncompleteLogin
             && records.count { $0.family == "codex" } == 1
-        let swapManagedHomes = Set(swaps.flatMap { [$0.mainHome, $0.home] })
+        let homeDirectory = observer.homeDirectory()
+        let swapManagedHomes = Set(swaps.flatMap { [$0.mainHome, $0.home] }.map {
+            CodexAccountDiscovery.standardizedHome($0, homeDirectory: homeDirectory)
+        })
         let allLogHomes = Array(Set(homes.map(\.home)).union(swapManagedHomes)).sorted()
 
         return records.compactMap { record in
