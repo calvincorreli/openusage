@@ -36,7 +36,7 @@ extension CodexAuthStore {
     func isCurrent(_ candidate: CodexAuthState) async -> Bool {
         switch candidate.source {
         case .file(let path): loadAuth(at: path) == candidate
-        case .keychain: await loadOffMainActor { loadKeychainAuth() } == candidate
+        case .keychain(let account): await loadOffMainActor { loadKeychainAuth(account: account) } == candidate
         case .pi(let source): loadPiAuth(source) == candidate
         }
     }
