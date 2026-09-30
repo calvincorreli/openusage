@@ -26,6 +26,10 @@ final class UpdaterController {
     private let presentationController: UpdaterPresentationController
     private var controller: SPUStandardUpdaterController?
     private var canCheckObservation: AnyCancellable?
+    private var automaticChecksObservation: AnyCancellable?
+    private var automaticDownloadsObservation: AnyCancellable?
+    private var automaticChecksMirror = false
+    private var automaticDownloadsMirror = false
 
     /// True once the real updater is running (release build with a feed). Settings reads this to decide
     /// whether to show the Updates section at all.
@@ -48,11 +52,25 @@ final class UpdaterController {
         }
     }
 
-    /// Backs the "Update Automatically" toggle. Sparkle persists this in `UserDefaults` itself,
-    /// so this is a thin pass-through rather than a shadow preference.
+    /// Backs the "Check for Updates Automatically" toggle. Sparkle persists this in `UserDefaults`
+    /// itself; the mirror follows Sparkle via KVO so the toggle stays in sync with Sparkle's update window.
     var automaticallyChecksForUpdates: Bool {
-        get { controller?.updater.automaticallyChecksForUpdates ?? false }
-        set { controller?.updater.automaticallyChecksForUpdates = newValue }
+        get { automaticChecksMirror }
+        set {
+            controller?.updater.automaticallyChecksForUpdates = newValue
+            syncAutomaticUpdateState()
+        }
+    }
+
+    /// Backs the "Install Updates Automatically" toggle — Sparkle's `automaticallyDownloadsUpdates`
+    /// (also flipped by the checkbox in Sparkle's own update window, which the KVO bridge picks up).
+    /// Sparkle ignores it (reads false) while automatic checks are off.
+    var automaticallyDownloadsUpdates: Bool {
+        get { automaticDownloadsMirror }
+        set {
+            controller?.updater.automaticallyDownloadsUpdates = newValue
+            syncAutomaticUpdateState()
+        }
     }
 
     init(presentationController: UpdaterPresentationController = UpdaterPresentationController()) {
@@ -89,6 +107,7 @@ final class UpdaterController {
         )
         self.controller = controller
         isActive = true
+        syncAutomaticUpdateState()
         // Bridge Sparkle's KVO property into our `@Observable` state so SwiftUI tracks button enablement.
         // Delivery is forced onto the main queue so the main-actor mutation below is always valid.
         canCheckForUpdates = controller.updater.canCheckForUpdates
@@ -97,16 +116,32 @@ final class UpdaterController {
             .sink { [weak self] value in
                 MainActor.assumeIsolated { self?.canCheckForUpdates = value }
             }
+        automaticChecksObservation = controller.updater.publisher(for: \.automaticallyChecksForUpdates)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncAutomaticUpdateState() }
+            }
+        automaticDownloadsObservation = controller.updater.publisher(for: \.automaticallyDownloadsUpdates)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncAutomaticUpdateState() }
+            }
         AppLog.info(.updates, "started (feed present)")
+    }
+
+    private func syncAutomaticUpdateState() {
+        automaticChecksMirror = controller?.updater.automaticallyChecksForUpdates ?? false
+        automaticDownloadsMirror = controller?.updater.automaticallyDownloadsUpdates ?? false
     }
 
     /// Restores the update preferences to their defaults — the Settings "Reset All Settings" path:
     /// stable channel, automatic checks on (the release Info.plist ships `SUEnableAutomaticChecks`
-    /// true). A dormant updater (dev build, no feed) has no auto-check state to restore; the
-    /// pass-through setter is a no-op there.
+    /// true), and automatic installs off. A dormant updater (dev build, no feed) has no update state
+    /// to restore; the setters are no-ops there.
     func resetToDefaults() {
         betaChannelEnabled = false
         automaticallyChecksForUpdates = true
+        automaticallyDownloadsUpdates = false
     }
 
     /// User-initiated check. Shows Sparkle's standard UI (progress, release notes, install prompt).

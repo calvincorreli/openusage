@@ -71,7 +71,7 @@ All three alerts default off. The first time you turn one on, OpenUsage asks for
 
 See [Logging](logging.md) for the full behavior: subsystem tags, the file size cap, and the guarantee that secrets are never written.
 
-**Reset All Settings…** restores every setting on this screen to its default — appearance, usage display, notifications, privacy, log level, the global shortcut (cleared), Launch at Login (turned off), iCloud sync (turned off), and the update preferences (stable channel, automatic checks on) — and also resets all customization, exactly like Customize's Reset All: default layout, order, and menu-bar stars, with providers turned back on for the tools you have installed. The reset cannot be undone.
+**Reset All Settings…** restores every setting on this screen to its default — appearance, usage display, notifications, privacy, log level, the global shortcut (cleared), Launch at Login (turned off), iCloud sync (turned off), and the update preferences (stable channel, automatic checks on, automatic installs off) — and also resets all customization, exactly like Customize's Reset All: default layout, order, and menu-bar stars, with providers turned back on for the tools you have installed. The reset cannot be undone.
 
 Not touched: provider logins and API keys, cached usage data, and your extra-analytics choice. Turning iCloud sync off as part of the reset works exactly like flipping its toggle off: this Mac's synced history is removed from the shared iCloud data, and your other Macs keep their own.
 
@@ -82,7 +82,8 @@ developer builds do not show it.
 
 | Setting | Options | What it does |
 |---|---|---|
-| Update Automatically | On / Off | Whether Sparkle checks for updates in the background. You can still check manually when this is off. |
+| Check for Updates Automatically | On / Off | Checks hourly and shows a banner when an update is available. You can still check manually when this is off. |
+| Install Updates Automatically | On / Off | Downloads updates in the background and installs them when OpenUsage quits. When off, choose when to install from the banner. Unavailable while automatic checks are off. Also changed by the "Automatically download and install updates in the future" checkbox in Sparkle's update window. |
 | Beta Updates | On / Off | Adds pre-release builds to the updates you can receive. Stable releases remain available either way. |
 | Check for Updates… | button | Starts a manual update check and opens Sparkle's update window. |
 

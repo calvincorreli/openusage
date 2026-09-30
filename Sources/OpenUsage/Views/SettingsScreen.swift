@@ -243,9 +243,16 @@ struct SettingsScreen: View {
         // dev build and a bare `swift run`, with no feed, hide this).
         if updater.isActive {
             section("Updates") {
-                row("Update Automatically") {
+                row("Check for Updates Automatically") {
                     Toggle("", isOn: $updater.automaticallyChecksForUpdates)
                         .settingsSwitchStyle()
+                        .hoverTooltip("Checks hourly and shows a banner when an update is available.")
+                }
+                row("Install Updates Automatically") {
+                    Toggle("", isOn: $updater.automaticallyDownloadsUpdates)
+                        .settingsSwitchStyle()
+                        .disabled(!updater.automaticallyChecksForUpdates)
+                        .hoverTooltip("Downloads updates in the background and installs them when OpenUsage quits. When off, you choose when to install from the banner.")
                 }
                 row("Beta Updates") {
                     Toggle("", isOn: $updater.betaChannelEnabled)

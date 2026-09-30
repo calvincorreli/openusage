@@ -3,6 +3,25 @@ import XCTest
 @testable import OpenUsage
 
 @MainActor
+final class UpdaterControllerTests: XCTestCase {
+    func testDormantUpdaterDoesNotKeepAutomaticUpdateSettingsAsShadowState() {
+        let updater = UpdaterController()
+        updater.start()
+
+        updater.automaticallyChecksForUpdates = true
+        updater.automaticallyDownloadsUpdates = true
+
+        XCTAssertFalse(updater.automaticallyChecksForUpdates)
+        XCTAssertFalse(updater.automaticallyDownloadsUpdates)
+
+        updater.resetToDefaults()
+
+        XCTAssertFalse(updater.automaticallyChecksForUpdates)
+        XCTAssertFalse(updater.automaticallyDownloadsUpdates)
+    }
+}
+
+@MainActor
 final class UpdaterPresentationControllerTests: XCTestCase {
     func testBringToFrontUsesReliableActivationAfterChangingPolicy() {
         var policy = NSApplication.ActivationPolicy.accessory
