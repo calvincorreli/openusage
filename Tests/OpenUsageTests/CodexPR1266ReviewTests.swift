@@ -10,8 +10,11 @@ final class CodexPR1266ReviewTests: XCTestCase {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    private func token(accountID: String? = nil, email: String, exp: Date? = nil) -> String {
-        var claims = [#""https://api.openai.com/profile":{"email":"\#(email)"}"#]
+    private func token(accountID: String? = nil, email: String?, exp: Date? = nil) -> String {
+        var claims: [String] = []
+        if let email {
+            claims.append(#""https://api.openai.com/profile":{"email":"\#(email)"}"#)
+        }
         if let accountID {
             claims.append(#""https://api.openai.com/auth":{"chatgpt_account_id":"\#(accountID)"}"#)
         }
@@ -330,5 +333,48 @@ final class CodexPR1266ReviewTests: XCTestCase {
         XCTAssertEqual(http.requests[1].url.host, "auth.openai.com")
         XCTAssertEqual(http.requests[2].headers["Authorization"], "Bearer \(renewed)")
         XCTAssertTrue(files.files["/home/auth.json"]?.contains(renewed) == true)
+    }
+
+    func testRefreshRotationPersistsBeforeRejectingIdentityWithoutEmail() async throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let expired = token(accountID: "A", email: "a@test", exp: now.addingTimeInterval(-60))
+        let rotated = token(accountID: "A", email: nil, exp: now.addingTimeInterval(3600))
+        let files = FakeFiles([
+            "/home/auth.json": authJSON(
+                accountID: "A",
+                email: "a@test",
+                accessToken: expired,
+                refreshToken: "rt1"
+            ),
+        ])
+        let http = RoutingHTTPClient { request in
+            if request.url.host == "auth.openai.com" {
+                return HTTPResponse(
+                    statusCode: 200,
+                    headers: [:],
+                    body: Data(#"{"access_token":"\#(rotated)","refresh_token":"rt2","id_token":"\#(rotated)"}"#.utf8)
+                )
+            }
+            return HTTPResponse(statusCode: 500, headers: [:], body: Data())
+        }
+        let provider = CodexProvider(
+            authStore: CodexAuthStore(
+                environment: FakeEnvironment(["CODEX_HOME": "/home"]),
+                files: files,
+                keychain: FakeKeychain(),
+                now: { now },
+                expectedIdentity: try XCTUnwrap(CodexAccountIdentity(accountID: "A", email: "a@test")),
+                writableAuthHomes: ["/home"]
+            ),
+            usageClient: CodexUsageClient(http: http),
+            now: { now }
+        )
+
+        _ = await provider.refresh()
+
+        let persisted = try XCTUnwrap(files.files["/home/auth.json"])
+        let auth = try XCTUnwrap(CodexAuthStore.parseAuth(persisted))
+        XCTAssertEqual(auth.tokens?.refreshToken, "rt2")
+        XCTAssertEqual(http.requests.count, 1)
     }
 }

@@ -27,12 +27,16 @@ extension CodexProvider {
                             candidate.auth.tokens?.refreshToken = refreshed.refreshToken ?? refreshToken
                             candidate.auth.tokens?.idToken = refreshed.idToken ?? currentIDToken
                             candidate.auth.lastRefresh = OpenUsageISO8601.string(from: now())
-                            guard authStore.scoped(candidate) != nil else { changed = true; break candidateLoop }
                             do {
                                 try authStore.save(candidate)
                                 currentState = candidate
                             } catch {
                                 AppLog.error(LogTag.auth("codex"), "failed to persist rotated account credentials: \(error.localizedDescription)")
+                            }
+                            guard authStore.scoped(candidate) != nil else {
+                                AppLog.warn(LogTag.auth("codex"), "rotated credential no longer matches this account; skipping it")
+                                changed = true
+                                break candidateLoop
                             }
                         }
                         guard let token = candidate.auth.tokens?.accessToken,
