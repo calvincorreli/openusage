@@ -134,6 +134,28 @@ final class CodexMultiAccountTests: XCTestCase {
         XCTAssertEqual(Set(logins.map(\.authPath)), ["/Users/dev/.pi/agent/auth.json"])
     }
 
+    func testAccountIDOnlyDefaultHomeStaysOwnCardBesideCompleteSibling() async throws {
+        let files = FakeFiles([
+            "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-A", email: ""),
+            "/Users/dev/.codex-work/auth.json": codexAuth(accountID: "ACCT-B", email: "b@test"),
+        ])
+
+        let assembly = await assemble(
+            files: files,
+            directories: ["/Users/dev": [".codex-work"]],
+            defaults: makeScratchDefaults()
+        )
+
+        XCTAssertEqual(assembly.codexCards.count, 2)
+        let accountA = try XCTUnwrap(assembly.codexCards.first { $0.identity.accountID == "acct-a" })
+        let accountB = try XCTUnwrap(assembly.codexCards.first { $0.identity.accountID == "acct-b" })
+        XCTAssertEqual(accountA.id, "codex")
+        XCTAssertTrue(accountA.authHomes.contains("/Users/dev/.codex"))
+        XCTAssertNotEqual(accountB.id, "codex")
+        XCTAssertFalse(accountA.allowsUnattributedHistory)
+        XCTAssertFalse(accountB.allowsUnattributedHistory)
+    }
+
     func testHomesAndPiMergeByWorkspaceAndUserIdentity() async throws {
         let files = FakeFiles([
             "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-WORK", email: "me@work.test"),

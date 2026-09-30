@@ -31,14 +31,15 @@ extension ProviderAccountAssembly {
             $0.family == "codex" && $0.identityKey.contains("|")
         })
         let discoveredHomes = discovery.homeLogins(additionalHomes: swaps.map(\.mainHome))
-        let homes = discoveredHomes.filter {
-            hasEstablishedAccounts || CodexAccountIdentity.isComplete(key: $0.identity.key)
-        }
+        let completeHomes = discoveredHomes.filter { CodexAccountIdentity.isComplete(key: $0.identity.key) }
+        let homes = hasEstablishedAccounts
+            ? discoveredHomes
+            : discoveredHomes.filter { !$0.identity.accountID.isEmpty }
         let hasIncompleteHomeLogin = discoveredHomes.contains {
             !CodexAccountIdentity.isComplete(key: $0.identity.key)
         }
         let piLogins = discovery.piLogins()
-        guard hasEstablishedAccounts || !homes.isEmpty || !piLogins.isEmpty else { return [] }
+        guard hasEstablishedAccounts || !completeHomes.isEmpty || !piLogins.isEmpty else { return [] }
 
         let configuredHomes = Set(CodexAccountDiscovery.configuredHomes(
             environment: observer.environment,
