@@ -237,11 +237,11 @@ final class CodexPR1266ReviewTests: XCTestCase {
         XCTAssertEqual(files.files["/test/saved/auth.json"], credential)
     }
 
-    func testIncompleteDefaultLoginBlocksUnattributedHistoryForSiblingAccount() async throws {
+    func testIncompleteDefaultLoginGetsOwnCardAndBlocksUnattributedHistoryForSiblingAccount() async throws {
         try await assertIncompleteDefaultLoginBlocksUnattributedHistory(siblingAccountID: "B", siblingKey: "b|b@test")
     }
 
-    func testIncompleteDefaultLoginBlocksUnattributedHistoryForSameWorkspaceSibling() async throws {
+    func testIncompleteDefaultLoginGetsOwnCardAndBlocksUnattributedHistoryForSameWorkspaceSibling() async throws {
         try await assertIncompleteDefaultLoginBlocksUnattributedHistory(siblingAccountID: "A", siblingKey: "a|b@test")
     }
 
@@ -277,10 +277,14 @@ final class CodexPR1266ReviewTests: XCTestCase {
             )
         )
 
-        let card = try XCTUnwrap(assembly.codexCards.first)
-        XCTAssertEqual(assembly.codexCards.count, 1)
-        XCTAssertEqual(card.identity.key, siblingKey)
-        XCTAssertFalse(card.allowsUnattributedHistory)
+        XCTAssertEqual(assembly.codexCards.count, 2)
+        let defaultCard = try XCTUnwrap(assembly.codexCards.first { $0.identity.key == "a|" })
+        let siblingCard = try XCTUnwrap(assembly.codexCards.first { $0.identity.key == siblingKey })
+        XCTAssertEqual(defaultCard.id, "codex")
+        XCTAssertTrue(defaultCard.authHomes.contains("/test/.codex"))
+        XCTAssertNotEqual(siblingCard.id, "codex")
+        XCTAssertFalse(defaultCard.allowsUnattributedHistory)
+        XCTAssertFalse(siblingCard.allowsUnattributedHistory)
     }
 
     func testRejectedUnexpiredHomeTokenRenewsAndRetries() async throws {
