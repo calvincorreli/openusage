@@ -48,11 +48,12 @@ struct CodexAccountDiscovery: Sendable {
     }
 
     static func configuredHomeValues(environment: EnvironmentReading) -> [String] {
-        let homes = environment.value(for: "CODEX_HOME")?
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty } ?? []
-        return homes.isEmpty ? ["~/.config/codex", "~/.codex"] : homes
+        if let home = environment.value(for: "CODEX_HOME")?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !home.isEmpty
+        {
+            return [home]
+        }
+        return ["~/.config/codex", "~/.codex"]
     }
 
     static func configuredHomes(environment: EnvironmentReading, homeDirectory: URL) -> [String] {

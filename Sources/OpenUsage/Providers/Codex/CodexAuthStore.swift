@@ -227,10 +227,12 @@ struct CodexAuthStore: Sendable {
     }
 
     func codexHome() -> String? {
-        environment.value(for: "CODEX_HOME")?
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first { !$0.isEmpty }
+        guard let codexHome = environment.value(for: "CODEX_HOME")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !codexHome.isEmpty
+        else {
+            return nil
+        }
+        return codexHome
     }
 
     /// Matches Codex's `compute_store_key`: SHA-256 of the canonical home, truncated to 16 hex

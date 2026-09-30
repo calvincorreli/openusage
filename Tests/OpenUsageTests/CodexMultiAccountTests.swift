@@ -91,9 +91,9 @@ final class CodexMultiAccountTests: XCTestCase {
         )
     }
 
-    func testCandidateHomesCoverConfiguredDefaultsAndSiblingDirectories() {
+    func testCandidateHomesTreatConfiguredCommaPathAsSingleHomeAndKeepSiblingDirectories() {
         let discovery = makeDiscovery(
-            environment: ["CODEX_HOME": "~/.codex, /opt/codex-ci"],
+            environment: ["CODEX_HOME": "  ~/custom,codex  "],
             files: FakeFiles(),
             directories: [
                 "/Users/dev": [".codex-work", ".codex-personal", ".config", "Documents"],
@@ -102,7 +102,7 @@ final class CodexMultiAccountTests: XCTestCase {
         )
 
         XCTAssertEqual(discovery.candidateHomes(), [
-            "/Users/dev/.codex", "/opt/codex-ci", "/Users/dev/.config/codex",
+            "/Users/dev/custom,codex", "/Users/dev/.config/codex", "/Users/dev/.codex",
             "/Users/dev/.codex-personal", "/Users/dev/.codex-work", "/Users/dev/.config/codex-ci",
         ])
     }
@@ -469,9 +469,9 @@ final class CodexMultiAccountTests: XCTestCase {
         XCTAssertEqual(providers.map { $0.authStore.piCredentialSources.count }, [1, 1])
     }
 
-    func testDefaultObserverUsesConfiguredHomeListAndAccessTokenIdentity() {
+    func testDefaultObserverUsesConfiguredCommaPathAsSingleHomeAndAccessTokenIdentity() {
         let files = FakeFiles([
-            "/second/auth.json": codexAuth(
+            "/missing, /second/auth.json": codexAuth(
                 accountID: nil,
                 email: "me@test",
                 accessAccountID: "ACCT"
@@ -486,7 +486,7 @@ final class CodexMultiAccountTests: XCTestCase {
 
         XCTAssertEqual(
             observer.observeCodex(),
-            .resolved(identityKey: "acct", label: "me@test", anchor: "/second")
+            .resolved(identityKey: "acct", label: "me@test", anchor: "/missing, /second")
         )
     }
 
