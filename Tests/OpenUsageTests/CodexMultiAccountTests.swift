@@ -156,6 +156,28 @@ final class CodexMultiAccountTests: XCTestCase {
         XCTAssertFalse(accountB.allowsUnattributedHistory)
     }
 
+    func testEmailOnlySiblingHomeAppearsOnFirstAssemblyWithStableCardIDs() async throws {
+        let files = FakeFiles([
+            "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-A", email: "a@test"),
+            "/Users/dev/.codex-work/auth.json": codexAuth(accountID: nil, email: "b@test"),
+        ])
+        let defaults = makeScratchDefaults()
+        let directories = ["/Users/dev": [".codex-work"]]
+
+        let first = await assemble(files: files, directories: directories, defaults: defaults)
+
+        XCTAssertEqual(first.codexCards.count, 2)
+        let emailOnly = try XCTUnwrap(first.codexCards.first {
+            $0.identity.accountID.isEmpty && $0.identity.email == "b@test"
+        })
+        XCTAssertFalse(emailOnly.allowsUnattributedHistory)
+
+        let second = await assemble(files: files, directories: directories, defaults: defaults)
+
+        XCTAssertEqual(second.codexCards.count, 2)
+        XCTAssertEqual(Set(second.codexCards.map(\.id)), Set(first.codexCards.map(\.id)))
+    }
+
     func testIncompletePiLoginDisablesUnattributedHistory() async throws {
         let files = FakeFiles([
             "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-A", email: "alice@test"),

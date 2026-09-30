@@ -32,9 +32,7 @@ extension ProviderAccountAssembly {
         })
         let discoveredHomes = discovery.homeLogins(additionalHomes: swaps.map(\.mainHome))
         let completeHomes = discoveredHomes.filter { CodexAccountIdentity.isComplete(key: $0.identity.key) }
-        let homes = hasEstablishedAccounts
-            ? discoveredHomes
-            : discoveredHomes.filter { !$0.identity.accountID.isEmpty }
+        let homes = discoveredHomes
         let hasIncompleteHomeLogin = discoveredHomes.contains {
             !CodexAccountIdentity.isComplete(key: $0.identity.key)
         }
