@@ -16,6 +16,11 @@ struct PiCodexLogin: Equatable, Sendable {
     let authPath: String
 }
 
+struct PiCodexLoginScan: Equatable, Sendable {
+    let logins: [PiCodexLogin]
+    let hasIncompleteLogin: Bool
+}
+
 struct CodexAccountDiscovery: Sendable {
     var environment: EnvironmentReading
     var files: TextFileAccessing
@@ -122,37 +127,51 @@ struct CodexAccountDiscovery: Sendable {
     }
 
     func piLogins() -> [PiCodexLogin] {
+        scanPiLogins().logins
+    }
+
+    func scanPiLogins() -> PiCodexLoginScan {
         let agentDir = piAgentDirectory()
         let authPath = agentDir + "/auth.json"
         let object: [String: Any]
         do {
-            guard let text = try files.readTextIfPresent(authPath) else { return [] }
+            guard let text = try files.readTextIfPresent(authPath) else {
+                return PiCodexLoginScan(logins: [], hasIncompleteLogin: false)
+            }
             guard let parsed = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
                 AppLog.error(.config, "accounts: pi auth.json is not a JSON object; pi Codex logins skipped")
-                return []
+                return PiCodexLoginScan(logins: [], hasIncompleteLogin: false)
             }
             object = parsed
         } catch {
             AppLog.error(.config, "accounts: pi auth.json could not be read; pi Codex logins skipped")
-            return []
+            return PiCodexLoginScan(logins: [], hasIncompleteLogin: false)
         }
         let labels = piSubscriptionLabels(agentDir: agentDir)
-        return object.keys
+        let providerIDs = object.keys
             .filter(Self.isPiCodexProvider)
             .sorted { Self.piProviderIndex($0) < Self.piProviderIndex($1) }
-            .compactMap { providerID in
-                guard let auth = Self.piAuth(in: object, providerID: providerID),
-                      let identity = CodexAccountIdentity(auth: auth),
-                      CodexAccountIdentity.isComplete(key: identity.key)
-                else { return nil }
-                return PiCodexLogin(
+        var logins: [PiCodexLogin] = []
+        var hasIncompleteLogin = false
+        for providerID in providerIDs {
+            guard let auth = Self.piAuth(in: object, providerID: providerID) else { continue }
+            guard let identity = CodexAccountIdentity(auth: auth),
+                  CodexAccountIdentity.isComplete(key: identity.key)
+            else {
+                hasIncompleteLogin = true
+                continue
+            }
+            logins.append(
+                PiCodexLogin(
                     providerID: providerID,
                     identity: identity,
                     planType: Self.planType(inTokenPayload: Self.identityPayload(auth)),
                     label: labels[providerID],
                     authPath: authPath
                 )
-            }
+            )
+        }
+        return PiCodexLoginScan(logins: logins, hasIncompleteLogin: hasIncompleteLogin)
     }
 
     static func loadPiAuth(files: TextFileAccessing, path: String, providerID: String) -> CodexAuth? {

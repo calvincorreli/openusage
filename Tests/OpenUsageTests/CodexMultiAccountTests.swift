@@ -156,6 +156,38 @@ final class CodexMultiAccountTests: XCTestCase {
         XCTAssertFalse(accountB.allowsUnattributedHistory)
     }
 
+    func testIncompletePiLoginDisablesUnattributedHistory() async throws {
+        let files = FakeFiles([
+            "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-A", email: "alice@test"),
+            "/Users/dev/.pi/agent/auth.json": piAuth([
+                ("openai-codex", "ACCT-B", ""),
+            ]),
+        ])
+
+        let assembly = await assemble(files: files, defaults: makeScratchDefaults())
+
+        XCTAssertEqual(assembly.codexCards.count, 1)
+        let alice = try XCTUnwrap(assembly.codexCards.first)
+        XCTAssertEqual(alice.identity.key, "acct-a|alice@test")
+        XCTAssertFalse(alice.allowsUnattributedHistory)
+    }
+
+    func testMatchingCompletePiLoginKeepsSingleAccountUnattributedHistory() async throws {
+        let files = FakeFiles([
+            "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-A", email: "alice@test"),
+            "/Users/dev/.pi/agent/auth.json": piAuth([
+                ("openai-codex", "ACCT-A", "alice@test"),
+            ]),
+        ])
+
+        let assembly = await assemble(files: files, defaults: makeScratchDefaults())
+
+        XCTAssertEqual(assembly.codexCards.count, 1)
+        let alice = try XCTUnwrap(assembly.codexCards.first)
+        XCTAssertEqual(alice.identity.key, "acct-a|alice@test")
+        XCTAssertTrue(alice.allowsUnattributedHistory)
+    }
+
     func testHomesAndPiMergeByWorkspaceAndUserIdentity() async throws {
         let files = FakeFiles([
             "/Users/dev/.codex/auth.json": codexAuth(accountID: "ACCT-WORK", email: "me@work.test"),

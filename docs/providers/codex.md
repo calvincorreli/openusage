@@ -53,7 +53,8 @@ never rotates pi's tokens.
 
 When more than one Codex account is known, OpenUsage excludes Codex, pi, and OpenCode spending that
 cannot prove which account paid for it. Live limits and reset-credit actions remain available on each
-card.
+card. A pi OAuth login missing its workspace or email also disables unattributed spending, even if it
+cannot form its own card.
 
 ## The spend tiles
 
