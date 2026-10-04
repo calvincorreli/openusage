@@ -70,6 +70,17 @@ Saving a refreshed Claude Code token updates only its access token, refresh toke
 latest credential document. MCP logins and other Claude Code fields are preserved, including changes
 made while OpenUsage was refreshing.
 
+## Separate Claude Code profiles
+
+OpenUsage also discovers Claude Code profiles in `~/.claude-*` folders. Each folder must
+contain a `.claude.json` file identifying its account and organization. Profiles share a
+card with existing Claude Code, Desktop, or Swap logins for the same account and organization.
+
+Cards show the account email when known. If the same email belongs to multiple organizations,
+the organization name is included to distinguish them. Each profile reads its own credentials
+and terminal history; a profile never borrows another profile's default credentials.
+Restart OpenUsage after adding a profile.
+
 ## Claude Swap accounts
 
 OpenUsage discovers the saved accounts in Claude Swap's `~/.claude-swap-backup/sequence.json`

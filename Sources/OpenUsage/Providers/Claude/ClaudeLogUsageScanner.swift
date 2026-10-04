@@ -29,6 +29,7 @@ actor ClaudeLogUsageScanner {
     private let organizationID: String?
     private let accountID: String?
     private let additionalConfigDirectories: [String]
+    private let ownedProfileDirectories: [String]
     private let allowsUnattributedSessions: Bool
     /// The identity Claude Code is signed in to right now, re-read every scan. The card matching it
     /// also owns the default home's sessions that record no account, which is how plain terminal
@@ -78,6 +79,7 @@ actor ClaudeLogUsageScanner {
         allowsUnattributedSessions: Bool = false,
         currentDefaultLoginIdentity: (@Sendable () -> String?)? = nil,
         additionalConfigDirectories: [String] = [],
+        ownedProfileDirectories: [String] = [],
         readOwnershipData: @escaping @Sendable (URL) throws -> Data = {
             try Data(contentsOf: $0, options: .mappedIfSafe)
         }
@@ -90,6 +92,7 @@ actor ClaudeLogUsageScanner {
         self.organizationID = organizationUUID?.lowercased()
         self.accountID = accountUUID?.lowercased()
         self.additionalConfigDirectories = additionalConfigDirectories
+        self.ownedProfileDirectories = ownedProfileDirectories
         self.allowsUnattributedSessions = allowsUnattributedSessions
         self.currentDefaultLoginIdentity = currentDefaultLoginIdentity ?? {
             let observer = DefaultAccountObserver(environment: environment, homeDirectory: homeDirectory)
@@ -220,7 +223,7 @@ actor ClaudeLogUsageScanner {
             addIfValid(home.appendingPathComponent(".claude"))
         }
 
-        for directory in additionalConfigDirectories {
+        for directory in additionalConfigDirectories + ownedProfileDirectories {
             addIfValid(URL(fileURLWithPath: expandHome(directory)))
         }
 
@@ -293,9 +296,12 @@ actor ClaudeLogUsageScanner {
         var ownedFiles: [JSONLScanning.DiscoveredFile] = []
         var desktopSessionIDs: Set<String>?
         var allDesktopSessionIDs: Set<String>?
-        let defaultProjectPrefixes = claimsDefaultHome
+        let defaultProjectPrefixes = (claimsDefaultHome
             ? defaultConfigRoots().map { $0.appendingPathComponent("projects").resolvingSymlinksInPath().path + "/" }
-            : []
+            : []) + ownedProfileProjectPrefixes()
+        let profileProjectPrefixes = ownedProfileDirectories.map {
+            URL(fileURLWithPath: $0).appendingPathComponent("projects").resolvingSymlinksInPath().path + "/"
+        }
         // Optional values retain read failures for this pass without persisting them.
         var identities: [String: ClaudeSessionIdentity?] = [:]
 
@@ -321,11 +327,12 @@ actor ClaudeLogUsageScanner {
             }
             guard let result = identities[sessionFile.path], let ownership = result else { continue }
             if case .conflicted = ownership { continue }
+            let isProfileSession = profileProjectPrefixes.contains(where: { canonicalPath.hasPrefix($0) })
             if case let .owned(owner, ownerAccount) = ownership {
                 if owner == organizationID, accountID == nil || ownerAccount == accountID {
                     ownedFiles.append(file)
                 }
-            } else if allowsUnattributedSessions {
+            } else if allowsUnattributedSessions && !isProfileSession {
                 ownedFiles.append(file)
             } else {
                 let sessionID = URL(fileURLWithPath: sessionFile.path)
@@ -348,6 +355,20 @@ actor ClaudeLogUsageScanner {
             }
         }
         return ownedFiles
+    }
+
+    private func ownedProfileProjectPrefixes() -> [String] {
+        guard let accountID, let organizationID else { return [] }
+        let expected = "\(accountID)|\(organizationID)"
+        return ownedProfileDirectories.compactMap { directory in
+            let observer = DefaultAccountObserver(
+                environment: ClaudeProfileEnvironment(base: environment, directory: directory),
+                homeDirectory: homeDirectory
+            )
+            guard case let .resolved(identity, _, _) = observer.observeClaude(), identity == expected else { return nil }
+            return URL(fileURLWithPath: directory).appendingPathComponent("projects")
+                .resolvingSymlinksInPath().path + "/"
+        }
     }
 
     /// Only a scoped card whose identity is the one Claude Code is signed in to right now.

@@ -401,6 +401,7 @@ final class ClaudeProviderTests: XCTestCase {
                     now: { now }
                 ),
                 logUsageScanner: ClaudeLogFixture.scanner(home: home),
+                allowsUnattributedPiUsage: false,
                 now: { now },
                 pricing: { TestPricing.bundled }
             )

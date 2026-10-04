@@ -8,6 +8,8 @@ struct ClaudeAccountCard: Equatable, Sendable {
     let usesDesktopCredentials: Bool
     let allowsUnattributedPiUsage: Bool
     var swapAccount: ClaudeSwapAccount? = nil
+    var profile: ClaudeProfileLogin? = nil
+    var additionalProfiles: [ClaudeProfileLogin] = []
     var additionalLogDirectories: [String] = []
     var organizationName: String? = nil
 }
@@ -76,6 +78,7 @@ struct ProviderAccountAssembly {
         families: Set<String> = ProviderAccountID.families,
         listCodexHomeDirectories: @escaping @Sendable (String) -> [String] = CodexHomeScanner.listSubdirectories,
         desktop: ClaudeDesktopAuthStore? = nil,
+        listClaudeHomeDirectories: @escaping @Sendable (String) -> [String] = CodexHomeScanner.listSubdirectories,
         listDesktopOrganizationDirectories: @escaping @Sendable (URL) -> [String] = { root in
             let urls = (try? FileManager.default.contentsOfDirectory(
                 at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
@@ -127,6 +130,7 @@ struct ProviderAccountAssembly {
             return ProviderAccountAssembly(identityKeysByCard: identityKeys, codex: codex)
         }
 
+        let profiles = ClaudeProfileLogin.discover(observer: observer, listDirectories: listClaudeHomeDirectories)
         let swapAccounts = ClaudeSwapAccount.discover(files: observer.files, home: observer.homeDirectory())
         if !swapAccounts.isEmpty {
             AppLog.info(.config, "accounts: discovered \(swapAccounts.count) Claude Swap accounts")
@@ -144,7 +148,7 @@ struct ProviderAccountAssembly {
             }
         }
 
-        if let claudeIdentity = identityKeys["claude"], !claudeIdentity.contains("|"), swapAccounts.isEmpty {
+        if let claudeIdentity = identityKeys["claude"], !claudeIdentity.contains("|"), swapAccounts.isEmpty, profiles.isEmpty {
             accountsStore.reconcile(with: observations)
             return ProviderAccountAssembly(identityKeysByCard: identityKeys, codex: codex)
         }
@@ -172,6 +176,19 @@ struct ProviderAccountAssembly {
                     family: "claude", identityKey: organization.identityKey,
                     label: organization.label, sources: [source]
                 ))
+            }
+        }
+
+        for profile in profiles {
+            let source = ProviderAccountSource(kind: .claudeHome, anchor: profile.home, holdsDefaultSource: false)
+            if let index = observations.firstIndex(where: {
+                $0.family == "claude" && $0.identityKey == profile.identityKey
+            }) {
+                observations[index].sources.append(source)
+                observations[index].label = profile.email
+            } else {
+                observations.append(.init(family: "claude", identityKey: profile.identityKey,
+                                          label: profile.email, sources: [source]))
             }
         }
 
@@ -248,8 +265,42 @@ struct ProviderAccountAssembly {
             ))
             identityKeys[record.id] = account.identityKey
         }
+        for profile in profiles {
+            guard !cards.contains(where: { $0.identityKey == profile.identityKey }),
+                  let record = records.first(where: {
+                      $0.family == "claude" && $0.identityKey == profile.identityKey && !$0.removedTombstone
+                  })
+            else { continue }
+            cards.append(ClaudeAccountCard(
+                id: record.id, identityKey: profile.identityKey, organizationID: profile.organizationID,
+                displayName: "Claude — \(profile.email)", usesDesktopCredentials: false,
+                allowsUnattributedPiUsage: allowsUnattributedPiUsage,
+                profile: profile, organizationName: profile.organizationName
+            ))
+            identityKeys[record.id] = profile.identityKey
+        }
         for index in cards.indices {
             cards[index].additionalLogDirectories = swapAccounts.map(\.sessionDirectory)
+            guard let profile = profiles.first(where: { $0.identityKey == cards[index].identityKey }) else { continue }
+            let existing = cards[index]
+            let sameEmail = profiles.filter { $0.email.lowercased() == profile.email.lowercased() }
+            let identities = Set(sameEmail.map(\.identityKey))
+            var label = profile.email
+            if identities.count > 1 {
+                let organization = profile.organizationName ?? profile.organizationID
+                let duplicateName = Set(sameEmail.filter { $0.organizationName == profile.organizationName }
+                    .map(\.identityKey)).count > 1
+                label += " (\(organization)\(duplicateName ? " · " + profile.organizationID.prefix(8) : ""))"
+            }
+            cards[index] = ClaudeAccountCard(
+                id: existing.id, identityKey: existing.identityKey, organizationID: existing.organizationID,
+                displayName: "Claude — \(label)", usesDesktopCredentials: false,
+                allowsUnattributedPiUsage: existing.allowsUnattributedPiUsage,
+                swapAccount: existing.swapAccount, profile: profile,
+                additionalProfiles: profiles.filter { $0.identityKey == existing.identityKey && $0.home != profile.home },
+                additionalLogDirectories: existing.additionalLogDirectories,
+                organizationName: profile.organizationName ?? existing.organizationName
+            )
         }
         return ProviderAccountAssembly(identityKeysByCard: identityKeys, claudeCards: cards, codex: codex)
     }

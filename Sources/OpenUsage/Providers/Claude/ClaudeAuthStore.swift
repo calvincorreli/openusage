@@ -76,6 +76,8 @@ struct ClaudeAuthStore: Sendable {
     let expectedIdentityKey: String?
     let desktopOnly: Bool
     let swapAccount: ClaudeSwapAccount?
+    let profile: ClaudeProfileLogin?
+    let additionalProfiles: [ClaudeProfileLogin]
     let preferOrganizationScopedDesktop: Bool
 
     init(
@@ -87,6 +89,8 @@ struct ClaudeAuthStore: Sendable {
         expectedIdentityKey: String? = nil,
         desktopOnly: Bool = false,
         swapAccount: ClaudeSwapAccount? = nil,
+        profile: ClaudeProfileLogin? = nil,
+        additionalProfiles: [ClaudeProfileLogin] = [],
         preferOrganizationScopedDesktop: Bool = false,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
@@ -95,9 +99,11 @@ struct ClaudeAuthStore: Sendable {
         self.keychain = keychain
         self.desktop = desktop ?? ClaudeDesktopAuthStore(files: files, now: now)
         self.desktopOrganization = desktopOrganization?.lowercased()
-        self.expectedIdentityKey = expectedIdentityKey?.lowercased() ?? swapAccount?.identityKey
+        self.expectedIdentityKey = expectedIdentityKey?.lowercased() ?? profile?.identityKey ?? swapAccount?.identityKey
         self.desktopOnly = desktopOnly
         self.swapAccount = swapAccount
+        self.profile = profile
+        self.additionalProfiles = additionalProfiles
         self.preferOrganizationScopedDesktop = preferOrganizationScopedDesktop
         self.now = now
     }
@@ -126,11 +132,33 @@ struct ClaudeAuthStore: Sendable {
                     return state
                 }
             }
-            candidates += orderedStoredCandidates()
+            let swapStore = ClaudeAuthStore(environment: environment, files: files, keychain: keychain,
+                                             swapAccount: swapAccount, now: now)
+            candidates += swapStore.orderedStoredCandidates().map { state in
+                var state = state
+                if profile != nil, state.source == .file {
+                    state.source = .accountFile(path: swapStore.credentialsPath())
+                }
+                return state
+            }
             if let vault = loadSwapVaultCredential(swapAccount) { candidates.append(vault) }
             stored = candidates
         } else {
-            stored = desktopOnly ? [] : orderedStoredCandidates()
+            stored = desktopOnly || profile != nil ? [] : orderedStoredCandidates()
+        }
+        if let profile {
+            let profileCandidates = ([profile] + additionalProfiles).flatMap { login in
+                let store = ClaudeAuthStore(environment: environment, files: files, keychain: keychain,
+                                            profile: login, now: now)
+                return store.orderedStoredCandidates().map { state in
+                    var state = state
+                    if state.source == .file { state.source = .accountFile(path: store.credentialsPath()) }
+                    return state
+                }
+            }
+            stored = profileCandidates + stored
+            var seen = Set<ClaudeCredentialState>()
+            stored = stored.filter { seen.insert($0).inserted }
         }
         var desktopStatus: ClaudeDesktopCredentialStatus = .notChecked
         // A working CLI login normally remains the source of truth and avoids a second Keychain prompt.
@@ -140,7 +168,7 @@ struct ClaudeAuthStore: Sendable {
         let hasUsableCLILogin = stored.contains {
             $0.hasUsableAccessToken && liveUsageAvailability($0) == .available
         }
-        if swapAccount != nil || forceDesktopFallback || !hasUsableCLILogin || preferOrganizationScopedDesktop {
+        if profile != nil || swapAccount != nil || forceDesktopFallback || !hasUsableCLILogin || preferOrganizationScopedDesktop {
             let expectedUser = expectedIdentityKey?.split(separator: "|").first.map(String.init)
             let result = desktop.load(
                 allowInteraction: allowDesktopInteraction,
@@ -161,11 +189,11 @@ struct ClaudeAuthStore: Sendable {
 
         // A scope-limited login produces a local-only snapshot, so try every live-capable matching
         // source first. Preserve source preference within each group, including Desktop preference.
-        if swapAccount != nil {
+        if profile != nil || swapAccount != nil {
             stored = stored.filter { liveUsageAvailability($0) == .available }
                 + stored.filter { liveUsageAvailability($0) != .available }
         }
-        let candidates = desktopOnly || swapAccount != nil ? stored : applyingEnvironmentToken(to: stored)
+        let candidates = desktopOnly || swapAccount != nil || profile != nil ? stored : applyingEnvironmentToken(to: stored)
         return ClaudeCredentialLoad(candidates: candidates, desktopStatus: desktopStatus)
     }
 
@@ -271,7 +299,8 @@ struct ClaudeAuthStore: Sendable {
     }
 
     func claudeHomeOverride() -> String? {
-        swapAccount?.sessionDirectory ?? envText("CLAUDE_CONFIG_DIR")
+        if let profile { return profile.usesDefaultKeychain ? nil : profile.home }
+        return swapAccount?.sessionDirectory ?? envText("CLAUDE_CONFIG_DIR")
     }
 
     // Resolved OAuth endpoint strings before URL validation. The suffix is derived from the same
@@ -341,9 +370,9 @@ struct ClaudeAuthStore: Sendable {
         // Only needs the file suffix, which never fails — keep this off the throwing URL path so
         // credential loading stays forgiving even when a custom OAuth URL is malformed.
         let base = "\(Self.keychainServicePrefix)\(resolveOAuthEndpoints().suffix)-credentials"
-        if let configDir = claudeHomeOverride() {
+        if let configDir = profile != nil ? profile?.keychainConfigDirectory : claudeHomeOverride() {
             let scoped = "\(base)-\(hashSuffix(configDir))"
-            return swapAccount == nil ? [scoped, base] : [scoped]
+            return swapAccount == nil && profile == nil ? [scoped, base] : [scoped]
         }
         return [base]
     }
@@ -427,7 +456,7 @@ struct ClaudeAuthStore: Sendable {
     }
 
     private func credentialsPath() -> String {
-        "\(claudeHomeOverride() ?? Self.defaultClaudeHome)/\(Self.credentialFileName)"
+        "\(profile?.home ?? claudeHomeOverride() ?? Self.defaultClaudeHome)/\(Self.credentialFileName)"
     }
 
     private func envText(_ name: String) -> String? {
