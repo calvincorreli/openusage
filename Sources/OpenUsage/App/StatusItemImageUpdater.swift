@@ -67,7 +67,8 @@ final class StatusItemImageUpdater {
                 ?? MenuBarStripRenderer.fallbackIcon
         }
         let content = MenuBarContentBuilder.build(
-            groups: container.layout.pinnedGroups,
+            groups: WeeklyResetOrder.sorted(container.layout.pinnedGroups, snapshots: container.dataStore.snapshots,
+                                            providerID: { $0.provider.id }),
             data: { container.dataStore.data(for: $0) }
         )
         return MenuBarStripRenderer.image(for: content, style: container.layout.menuBarStyle)

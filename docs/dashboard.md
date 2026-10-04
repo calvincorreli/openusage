@@ -1,5 +1,7 @@
 # Dashboard
 
+Account cards are sorted across all providers by their next weekly quota reset, soonest first. The main weekly quota takes priority over model-specific weekly windows; providers with only model-specific weekly windows use their earliest reset. Session resets and reset-credit expirations do not affect this order. Cards without a known future weekly reset go last. Ties keep your saved Customize order, and fresh usage data updates the order automatically, even when the weekly metric is hidden.
+
 The popover that opens from the menu bar icon. Providers are sections; each section shows the metrics you've enabled.
 
 ## First launch
@@ -75,7 +77,7 @@ The **provider list** shows every provider with a switch to turn it on or off, a
 
 A provider's **detail** has a back button and provider-specific Reset control in its top bar, followed by two metric sections: **Always Visible** (shown on the dashboard card) and **On Demand** (tucked behind the card's caret). Each metric row has a drag grip, its name, an always-visible star for the menu bar, and an on/off switch. Drag a metric into the other card—or onto one of that card's rows—to move it between Always Visible and On Demand. An empty card shows a dashed **Drag metrics here** target. You can star up to two metrics per provider. OpenRouter and Z.ai also show an **API Key** section here, where you can add, replace, reveal, or clear that provider's key.
 
-Drag-reorder also works directly on the dashboard — drag a row within its provider, drag it across the caret boundary while the card is open, or drag a provider header to reorder sections. On a Force Touch trackpad you'll feel a light tap each time the dragged item snaps into a new slot.
+Drag-reorder also works directly on the dashboard — drag a row within its provider, drag it across the caret boundary while the card is open, or drag a provider header to change the saved order used for weekly-reset ties and unknown resets. Weekly reset priority takes precedence over manual provider ordering. On a Force Touch trackpad you'll feel a light tap each time the dragged item snaps into a new slot.
 
 The default reset layout keeps each provider's core quota meters and Usage Trend always visible, then tucks balances, reset details, and spend-history rows on demand. Optional detail rows like Claude Sonnet and Cursor Requests/Credits stay off by default, but start on demand if you enable them.
 

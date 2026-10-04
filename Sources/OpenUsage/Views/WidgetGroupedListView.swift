@@ -24,17 +24,21 @@ struct WidgetGroupedListView: View {
 
     @Environment(\.codexResetClaims) private var codexResetClaims
 
+    private var displayGroups: [ProviderGroup] {
+        WeeklyResetOrder.sorted(layout.displayGroups, snapshots: dataStore.snapshots, providerID: { $0.provider.id })
+    }
+
     var body: some View {
         // Provider-section spacing is noticeably wider than the in-card row rhythm (so groups
         // still read as groups); the exact step comes from the density setting.
         VStack(alignment: .leading, spacing: density.sectionSpacing) {
-            ForEach(layout.displayGroups) { group in
+            ForEach(displayGroups) { group in
                 section(group)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onPreferenceChange(ReorderFramePreferenceKey.self) { frameStore.frames = $0 }
-        .animation(Motion.spring, value: layout.displayGroups.map(\.provider.id))
+        .animation(Motion.spring, value: displayGroups.map(\.provider.id))
     }
 
     private func section(_ group: ProviderGroup) -> some View {
@@ -289,7 +293,7 @@ struct WidgetGroupedListView: View {
             active: $activeProviderID,
             lift: $reorderLift,
             makeLift: { makeProviderLift(for: group, value: $0) },
-            orderedIDs: { layout.displayGroups.map(\.provider.id) },
+            orderedIDs: { displayGroups.map(\.provider.id) },
             reorder: { layout.reorderProvider(dragged: group.provider.id, target: $0) }
         )
     }

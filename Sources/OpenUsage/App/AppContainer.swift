@@ -207,7 +207,10 @@ final class AppContainer {
         self.privacy = MenuBarPrivacyStore()
         self.localAPI = LocalUsageServer(state: { [layout, enablement, dataStore] in
             LocalUsageAPI.State(
-                enabledOrderedIDs: layout.orderedProviderIDs().filter { enablement.isEnabled($0) },
+                enabledOrderedIDs: WeeklyResetOrder.sorted(
+                    layout.orderedProviderIDs().filter { enablement.isEnabled($0) },
+                    snapshots: dataStore.snapshots, providerID: { $0 }
+                ),
                 knownIDs: Set(registry.providers.map(\.id)),
                 snapshots: dataStore.snapshots,
                 limitDescriptors: registry.limitDescriptorsByProvider,

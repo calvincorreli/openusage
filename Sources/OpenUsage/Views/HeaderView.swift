@@ -127,7 +127,8 @@ struct HeaderView: View {
     /// a navigation toggle would — the share card reads the same live stores the dashboard does.
     @ViewBuilder
     private var shareScreenshotMenu: some View {
-        let groups = layout.displayGroups
+        let groups = WeeklyResetOrder.sorted(layout.displayGroups, snapshots: dataStore.snapshots,
+                                            providerID: { $0.provider.id })
         Menu {
             if groups.isEmpty {
                 // No provider is showing anything to screenshot — grey the item out instead of offering
